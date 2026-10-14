@@ -1,7 +1,7 @@
 # opencode-menubar
 
 A lightweight native macOS menu bar app that shows OpenCode activity across all
-sessions. One icon, three states, no Dock icon, and no session switching.
+sessions. One icon, three states, and a live session list with elapsed timers.
 
 Built with Swift and AppKit, with a small global OpenCode plugin. No Electron,
 web view, third-party runtime dependencies, or background HTTP server.
@@ -20,8 +20,39 @@ has stopped, not that the last task succeeded.
 
 The icon uses the official OpenCode logo geometry from
 [`favicon.svg`](https://opencode.ai/favicon.svg), drawn natively as a vector for
-crisp Retina rendering. Click it to check activity and connection status or quit.
+crisp Retina rendering. Click it to see connected sessions, activity, elapsed
+timers, and connection status, or quit.
 The current menu text is in Spanish.
+
+## Expanded session menu
+
+Each observed session uses its descriptive sidebar title, followed by its state,
+elapsed time, and project name:
+
+```text
+Fix login
+    Trabajando · hace 2 min 15 s · my-app
+Review checkout
+    Requiere atención · hace 30 s · website
+Update dependencies
+    En reposo · hace 1 min 5 s · api
+```
+
+Active sessions are listed first, with attention taking priority. Timers update
+while the menu is open. Working time is measured from the start of the current
+run, including any waits or retries; answering a question does not reset it.
+Attention and idle durations are measured from the last state transition. A new
+run starts a fresh timer.
+
+The menu lists sessions observed since each plugin instance connected, including
+resumed sessions after they are selected or used. Idle sessions stay listed until
+deleted or their instance disconnects. It does not load the full session history.
+
+Titles come from OpenCode session metadata. For local sessions, the app also
+looks up connected session titles in OpenCode's SQLite database using a read-only
+connection, refreshing cached names every 2 seconds. This follows sidebar renames
+and resolves titles for instances still running an older plugin. The app never
+shows a session ID as its name; unavailable names use a temporary loading label.
 
 ## Requirements
 
@@ -55,14 +86,14 @@ closes it until you reopen it or log in again.
 
 ## Verify an installation
 
-With other OpenCode sessions idle, run:
+Run:
 
 ```sh
 bun scripts/verify-installed.js
 ```
 
 This starts a temporary local OpenCode server, runs `sleep 3` in a real session,
-and checks that the running app transitions from working to idle. Controlled
+and checks that its row in the running app transitions from working to idle. Controlled
 question events verify the attention state. No model requests are made. The
 script deletes its test session and stops the temporary server when finished.
 
@@ -70,8 +101,9 @@ script deletes its test session and stops the temporary server when finished.
 
 Each plugin instance writes a separate JSON snapshot to
 `~/Library/Application Support/OpenCode Menu Bar/states`. Snapshots contain
-internal session identifiers and activity states, not prompts, responses, project
-paths, or session titles. Files use private permissions and atomic renames.
+internal session identifiers, titles, project folder names, activity states, and
+timestamps. It does not store prompts, responses, or full project paths.
+Files use private permissions and atomic renames.
 The app and plugin communicate through local files without opening a network port.
 
 The plugin sends a heartbeat every 5 seconds. The app checks activity every
